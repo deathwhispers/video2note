@@ -1,132 +1,80 @@
 import asyncio
-import logging
 import os
-from pathlib import Path
-from typing import Dict, Optional
+from bilix.sites.bilibili import DownloaderBilibili
+from bilix.exception import APIError
 
-from src.utils import load_config, ensure_dir
-
-# -------------------------------
-# 初始化日志
-# -------------------------------
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-
-# -------------------------------
-# 可选依赖
-# -------------------------------
-try:
-    from bilix.sites.bilibili import DownloaderBilibili
-except ImportError as e:
-    raise ImportError("请先安装 bilix >= 0.18.0: pip install -U bilix") from e
-
-try:
-    import yt_dlp
-except ImportError:
-    yt_dlp = None
+# ----------------------------
+# 配置区
+# ----------------------------
+DEFAULT_DOWNLOAD_DIR = "downloads"
+COOKIES_PATH = "cookies.json"  # 建议你提前保存好 cookies.json
 
 
-class VideoDownloader:
-    """通用视频下载器，支持 Bilibili / YouTube / Mock 模式"""
+async def download_bilibili_video(url: str, cookies_path: str = COOKIES_PATH):
+    """
+    自动下载 B 站视频，选择非会员最高画质。
+    如果 cookies 不存在，则匿名下载（清晰度可能更低）。
+    """
+    # 检查 cookies 文件是否存在
+    cookies = cookies_path if os.path.exists(cookies_path) else None
+    if cookies:
+        print(f"✅ 使用 cookies 登录: {cookies_path}")
+    else:
+        print("⚠️ 未检测到 cookies.json，将以匿名方式下载。")
 
-    def __init__(self, config: Dict):
-        self.config = config
-        self.video_cfg = config.get("video", {})
-        self.app_cfg = config.get("app", {})
+    # 下载目录
+    os.makedirs(DEFAULT_DOWNLOAD_DIR, exist_ok=True)
 
-        self.source = self.video_cfg.get("source")
-        self.output_dir = ensure_dir(self.video_cfg.get("download_path", "./downloads"))
-        self.language = self.video_cfg.get("language", "zh")
-        self.quality = self.video_cfg.get("quality", "best")
-        self.login_cfg = self.video_cfg.get("login", {})
+    # 初始化下载器
+    d = DownloaderBilibili(cookies=cookies)
 
-        self.mock = bool(self.app_cfg.get("mock", False))  # 从 app 读取 mock
+    try:
+        # 自动选择非会员可下载的最高画质
+        print(f"🎬 开始下载: {url}")
+        await d.get_video(
+            url,
+            path=DEFAULT_DOWNLOAD_DIR,
+            quality=80,  # 80 通常是非会员最高 (720p)
+            hierarchy=True,  # 按UP主/标题自动分层
+            image=False,     # 不下载封面
+            subtitle=False   # 不下载字幕
+        )
 
-        if not self.source:
-            raise ValueError("config.video.source 未配置视频地址")
+    except APIError:
+        print("❌ Cookies 已过期或无效，将尝试匿名模式重新下载。")
+        d = DownloaderBilibili()
+        await d.get_video(
+            url,
+            path=DEFAULT_DOWNLOAD_DIR,
+            quality=80,
+            hierarchy=True
+        )
 
-        # 自动识别平台
-        if "bilibili.com" in self.source:
-            self.platform = "bilibili"
-        elif "youtube.com" in self.source or "youtu.be" in self.source:
-            self.platform = "youtube"
-        else:
-            self.platform = "unknown"
+    finally:
+        await d.aclose()
 
-    async def download(self):
-        """主入口：根据平台分发下载逻辑"""
-        if self.mock:
-            logger.warning("[MOCK] 模拟下载模式已启用，不会下载真实视频。")
-            fake_path = os.path.join(self.output_dir, "mock_video.mp4")
-            with open(fake_path, "w", encoding="utf-8") as f:
-                f.write("This is a mock video file.")
-            logger.info(f"[MOCK] 模拟视频已生成: {fake_path}")
-            return [fake_path]
-
-        if self.platform == "bilibili":
-            return await self._download_bilibili()
-        elif self.platform == "youtube":
-            return self._download_youtube()
-        else:
-            raise ValueError(f"不支持的平台: {self.source}")
-
-    async def _download_bilibili(self):
-        """B站下载逻辑"""
-        login_method = self.login_cfg.get("method", "qrcode")
-        username = self.login_cfg.get("username")
-        password = self.login_cfg.get("password")
-
-        cookie_path = Path("cookies") / "bilibili.txt"
-        cookie_path.parent.mkdir(parents=True, exist_ok=True)
-
-        dl = DownloaderBilibili(cookie_file=str(cookie_path))
-
-        if not cookie_path.exists():
-            if login_method == "account" and username and password:
-                logger.info("[Bilibili] 使用账号密码登录 ...")
-                await dl.login_by_password(username, password)
-                await dl.save_cookies(str(cookie_path))
-            elif login_method == "qrcode":
-                logger.info("[Bilibili] 使用扫码登录 ...")
-                await dl.login_by_qrcode()
-                await dl.save_cookies(str(cookie_path))
-            else:
-                raise ValueError(f"[Bilibili] 未知的登录方式: {login_method}")
-        else:
-            logger.info("[Bilibili] 检测到已存在 cookies，将直接使用。")
-
-        logger.info(f"[Bilibili] 开始下载视频: {self.source}")
-        await dl.get_video(self.source, path=self.output_dir, quality=self.quality)
-        logger.info(f"[Bilibili] 视频已下载到: {self.output_dir}")
-        return [self.output_dir]
-
-    def _download_youtube(self):
-        """YouTube 下载逻辑"""
-        if not yt_dlp:
-            raise ImportError("请先安装 yt-dlp: pip install -U yt-dlp")
-
-        ydl_opts = {
-            "outtmpl": os.path.join(self.output_dir, "%(title)s.%(ext)s"),
-            "format": "bestvideo+bestaudio/best",
-            "merge_output_format": "mp4",
-            "quiet": False,
-        }
-
-        logger.info(f"[YouTube] 开始下载视频: {self.source}")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([self.source])
-        logger.info(f"[YouTube] 视频已下载到: {self.output_dir}")
-        return [self.output_dir]
+    print("✅ 下载完成！")
 
 
-# -------------------------------
-# CLI 入口
-# -------------------------------
-async def download_video(config_path: str = "config.yaml"):
-    config = load_config(config_path)
-    downloader = VideoDownloader(config)
-    await downloader.download()
+def download_video(video_cfg):
+    """
+    对外暴露的主函数
+    video_cfg 示例:
+    {
+        "url": "https://www.bilibili.com/video/BV1xx411c7XX",
+        "cookies_path": "cookies.json"
+    }
+    """
+    url = video_cfg.get("url")
+    cookies_path = video_cfg.get("cookies_path", COOKIES_PATH)
+    asyncio.run(download_bilibili_video(url, cookies_path))
+    return os.path.abspath(DEFAULT_DOWNLOAD_DIR)
 
 
 if __name__ == "__main__":
-    asyncio.run(download_video())
+    # 测试用例
+    test_cfg = {
+        "url": "https://www.bilibili.com/video/BV1xx411c7XX",  # 这里换成你的视频链接
+        "cookies_path": "cookies.json"
+    }
+    download_video(test_cfg)

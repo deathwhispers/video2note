@@ -1,31 +1,51 @@
+# =============================
+# 全局应用配置
+# =============================
 app:
-  mock: false
+  mock: false           # 是否启用 mock 模式（测试时可用）
+  log_level: "INFO"     # 日志等级：DEBUG / INFO / WARNING / ERROR
 
-
+# =============================
+# 视频下载配置
+# =============================
 video:
-  source: "https://www.bilibili.com/video/BV1NCgVzoEG9/?vd_source=1ce32605a59581a6ec6d48f9eaa72d66"
+  source: "https://www.bilibili.com/video/BV1NCgVzoEG9/"  # 视频链接
   download_path: "./downloads"
   language: "zh"
-  quality: "best"
+  quality: "best"        # 支持 best, 1080, 720 等
   login:
-    method: "qrcode"  # qrcode / account
-    username: ""
-    password: ""
+    method: "cookies"    # 登录方式：cookies / qrcode / account
+    cookies_path: "config/www.bilibili.com_cookies.txt"
+    username: ""         # account 登录模式需要
+    password: ""         # account 登录模式需要
 
+# =============================
+# AI 配置
+# =============================
 ai:
-  provider: "openai"
+  provider: "openai"       # 可选：openai / anthropic / gemini / qwen / ernie / vllm
   model: "gpt-4o-mini"
   temperature: 0.7
 
+# =============================
+# AI 供应商统一配置
+# =============================
 providers:
   openai:
     api_key: "sk-xxxx"
     endpoint: "https://api.openai.com/v1/chat/completions"
-    prompt_template: "..."
+    prompt_template: |
+      你是一个技术笔记生成助手，请基于以下视频转录内容生成 Markdown 技术文档：
+      要求包括：章节标题、代码示例、mermaid 图、总结。
+      内容如下：
+      {{transcript}}
 
+# =============================
+# Notion 同步配置（可选）
+# =============================
 notion:
   enable: true
   token: "notion-secret-xxx"
-  database_id: "xxxx"
+  database_id: "xxxx-xxxx-xxxx"
   tags: ["AI 学习", "视频总结"]
   publish_status: "Published"

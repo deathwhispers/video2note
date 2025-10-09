@@ -1,16 +1,10 @@
 # =============================
-# AI 供应商统一配置中心
+# 各厂商 API Key / Endpoint 配置
 # =============================
-
-# 所有 Key、Endpoint、Model 都统一定义在这里
 providers:
   openai:
     api_key: "sk-xxxx"
     endpoint: "https://api.openai.com/v1/chat/completions"
-    models:
-      - gpt-4o
-      - gpt-4o-mini
-      - gpt-3.5-turbo
     prompt_template: |
       你是一个技术笔记生成助手，请基于以下视频转录内容生成 Markdown 技术文档：
       要求包括：章节标题、代码示例、mermaid 图、总结。
@@ -20,35 +14,19 @@ providers:
   anthropic:
     api_key: "claude-xxx"
     endpoint: "https://api.anthropic.com/v1/messages"
-    models:
-      - claude-3-opus
-      - claude-3-sonnet
-      - claude-3-haiku
-
-  gemini:
-    api_key: "AIza-xxxx"
-    endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent"
-    models:
-      - gemini-1.5-pro
-      - gemini-1.5-flash
-
-  qwen:
-    api_key: "ak-xxxx"
-    endpoint: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-    models:
-      - qwen-turbo
-      - qwen-plus
 
   ernie:
     api_key: "xxxx"
     endpoint: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/{{model}}"
-    models:
-      - ernie-bot
-      - ernie-bot-turbo
+
+  gemini:
+    api_key: "AIza-xxxx"
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent"
+
+  qwen:
+    api_key: "ak-xxxx"
+    endpoint: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
 
   vllm:
     base_url: "http://localhost:8000"
     endpoint: "{{base_url}}/generate"
-    models:
-      - llama-3-8b
-      - mistral-7b
