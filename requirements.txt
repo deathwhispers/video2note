@@ -1,5 +1,13 @@
-PyYAML
-requests
-youtube-dl
-openai
-ffmpeg-python
+# 核心工具
+PyYAML>=6.0
+yt-dlp>=2025.9.26
+you-get>=0.4.1570
+ffmpeg-python>=0.2.0
+notion-client>=2.0.0
+openai>=1.7.0
+
+# B站扫码/登录
+bilix>=0.18.9
+
+# 可选
+requests>=2.31.0

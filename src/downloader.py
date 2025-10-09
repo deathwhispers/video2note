@@ -1,132 +1,132 @@
+import asyncio
+import logging
 import os
-import subprocess
-import re
-from utils import ensure_dir, load_yaml_config
+from pathlib import Path
+from typing import Dict, Optional
+
+from src.utils import load_config, ensure_dir
+
+# -------------------------------
+# 初始化日志
+# -------------------------------
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+# -------------------------------
+# 可选依赖
+# -------------------------------
+try:
+    from bilix.sites.bilibili import DownloaderBilibili
+except ImportError as e:
+    raise ImportError("请先安装 bilix >= 0.18.0: pip install -U bilix") from e
+
+try:
+    import yt_dlp
+except ImportError:
+    yt_dlp = None
 
 
-# ------------------------------------------
-# 下载器映射表（可根据需要扩展）
-# ------------------------------------------
-DOWNLOADER_MAP = {
-    "youtube": {
-        "patterns": [r"youtube\.com", r"youtu\.be"],
-        "cmd": ["yt-dlp", "-f", "best", "-o", "{output}", "{url}"],
-    },
-    "bilibili": {
-        "patterns": [r"bilibili\.com"],
-        "cmd": ["you-get", "-o", "{output_dir}", "{url}"],
-    },
-    "tencent": {
-        "patterns": [r"v\.qq\.com"],
-        "cmd": ["you-get", "-o", "{output_dir}", "{url}"],
-    },
-    "douyin": {
-        "patterns": [r"douyin\.com"],
-        "cmd": ["yt-dlp", "-o", "{output}", "{url}"],
-    },
-    "weibo": {
-        "patterns": [r"weibo\.com"],
-        "cmd": ["you-get", "-o", "{output_dir}", "{url}"],
-    },
-}
+class VideoDownloader:
+    """通用视频下载器，支持 Bilibili / YouTube / Mock 模式"""
+
+    def __init__(self, config: Dict):
+        self.config = config
+        self.video_cfg = config.get("video", {})
+        self.app_cfg = config.get("app", {})
+
+        self.source = self.video_cfg.get("source")
+        self.output_dir = ensure_dir(self.video_cfg.get("download_path", "./downloads"))
+        self.language = self.video_cfg.get("language", "zh")
+        self.quality = self.video_cfg.get("quality", "best")
+        self.login_cfg = self.video_cfg.get("login", {})
+
+        self.mock = bool(self.app_cfg.get("mock", False))  # 从 app 读取 mock
+
+        if not self.source:
+            raise ValueError("config.video.source 未配置视频地址")
+
+        # 自动识别平台
+        if "bilibili.com" in self.source:
+            self.platform = "bilibili"
+        elif "youtube.com" in self.source or "youtu.be" in self.source:
+            self.platform = "youtube"
+        else:
+            self.platform = "unknown"
+
+    async def download(self):
+        """主入口：根据平台分发下载逻辑"""
+        if self.mock:
+            logger.warning("[MOCK] 模拟下载模式已启用，不会下载真实视频。")
+            fake_path = os.path.join(self.output_dir, "mock_video.mp4")
+            with open(fake_path, "w", encoding="utf-8") as f:
+                f.write("This is a mock video file.")
+            logger.info(f"[MOCK] 模拟视频已生成: {fake_path}")
+            return [fake_path]
+
+        if self.platform == "bilibili":
+            return await self._download_bilibili()
+        elif self.platform == "youtube":
+            return self._download_youtube()
+        else:
+            raise ValueError(f"不支持的平台: {self.source}")
+
+    async def _download_bilibili(self):
+        """B站下载逻辑"""
+        login_method = self.login_cfg.get("method", "qrcode")
+        username = self.login_cfg.get("username")
+        password = self.login_cfg.get("password")
+
+        cookie_path = Path("cookies") / "bilibili.txt"
+        cookie_path.parent.mkdir(parents=True, exist_ok=True)
+
+        dl = DownloaderBilibili(cookie_file=str(cookie_path))
+
+        if not cookie_path.exists():
+            if login_method == "account" and username and password:
+                logger.info("[Bilibili] 使用账号密码登录 ...")
+                await dl.login_by_password(username, password)
+                await dl.save_cookies(str(cookie_path))
+            elif login_method == "qrcode":
+                logger.info("[Bilibili] 使用扫码登录 ...")
+                await dl.login_by_qrcode()
+                await dl.save_cookies(str(cookie_path))
+            else:
+                raise ValueError(f"[Bilibili] 未知的登录方式: {login_method}")
+        else:
+            logger.info("[Bilibili] 检测到已存在 cookies，将直接使用。")
+
+        logger.info(f"[Bilibili] 开始下载视频: {self.source}")
+        await dl.get_video(self.source, path=self.output_dir, quality=self.quality)
+        logger.info(f"[Bilibili] 视频已下载到: {self.output_dir}")
+        return [self.output_dir]
+
+    def _download_youtube(self):
+        """YouTube 下载逻辑"""
+        if not yt_dlp:
+            raise ImportError("请先安装 yt-dlp: pip install -U yt-dlp")
+
+        ydl_opts = {
+            "outtmpl": os.path.join(self.output_dir, "%(title)s.%(ext)s"),
+            "format": "bestvideo+bestaudio/best",
+            "merge_output_format": "mp4",
+            "quiet": False,
+        }
+
+        logger.info(f"[YouTube] 开始下载视频: {self.source}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([self.source])
+        logger.info(f"[YouTube] 视频已下载到: {self.output_dir}")
+        return [self.output_dir]
 
 
-# ------------------------------------------
-# 自动识别视频来源
-# ------------------------------------------
-def detect_provider(url: str) -> str:
-    for provider, cfg in DOWNLOADER_MAP.items():
-        for pattern in cfg["patterns"]:
-            if re.search(pattern, url):
-                return provider
-    return "unknown"
+# -------------------------------
+# CLI 入口
+# -------------------------------
+async def download_video(config_path: str = "config.yaml"):
+    config = load_config(config_path)
+    downloader = VideoDownloader(config)
+    await downloader.download()
 
 
-# ------------------------------------------
-# 核心下载函数
-# ------------------------------------------
-def download_video(url, download_path, tag=None, config_path="config/config.yaml"):
-    ensure_dir(download_path)
-    config = load_yaml_config(config_path)
-    download_cfg = config.get("download", {})
-
-    mock_enabled = download_cfg.get("mock", False)
-    proxy = download_cfg.get("proxy", None)
-    timeout = download_cfg.get("timeout", 600)
-    fallback_to_mock = download_cfg.get("fallback_to_mock", True)
-
-    provider = tag or detect_provider(url)
-    provider_cfg = DOWNLOADER_MAP.get(provider)
-    filename = os.path.join(download_path, f"{provider}_video.mp4")
-
-    print(f"[downloader] Detected provider: {provider}")
-    print(f"[downloader] Download target: {filename}")
-
-    # 如果开启 mock 模式
-    if mock_enabled:
-        print("[downloader] Mock mode enabled in config, creating mock file.")
-        return mock_download(filename)
-
-    if provider_cfg is None:
-        print(f"[downloader] No matching provider for URL: {url}")
-        if fallback_to_mock:
-            print("[downloader] Fallback to mock mode.")
-            return mock_download(filename)
-        raise RuntimeError("Unsupported video source and mock disabled.")
-
-    # 构造下载命令
-    cmd_template = provider_cfg["cmd"]
-    cmd = [arg.format(url=url, output=filename, output_dir=download_path) for arg in cmd_template]
-
-    # 添加代理支持
-    if proxy and "yt-dlp" in cmd[0]:
-        cmd.insert(1, f"--proxy={proxy}")
-
-    print(f"[downloader] Executing: {' '.join(cmd)}")
-
-    try:
-        subprocess.run(cmd, check=True, timeout=timeout)
-        print(f"[downloader] Download complete: {filename}")
-        return filename
-    except subprocess.TimeoutExpired:
-        print(f"[downloader] Timeout after {timeout} seconds.")
-    except subprocess.CalledProcessError as e:
-        print(f"[downloader] Command failed: {e}")
-    except FileNotFoundError:
-        print("[downloader] Downloader tool not found, please install yt-dlp or you-get.")
-
-    # 自动回退
-    if fallback_to_mock:
-        print("[downloader] Falling back to mock mode due to failure.")
-        return mock_download(filename)
-    else:
-        raise RuntimeError(f"Download failed for {url} and mock fallback disabled.")
-
-
-# ------------------------------------------
-# 模拟下载（离线模式）
-# ------------------------------------------
-def mock_download(filename):
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write("This is a mock video file for testing only.\n")
-    print(f"[downloader] Mock video created at: {filename}")
-    return filename
-
-
-# ------------------------------------------
-# 测试运行入口
-# ------------------------------------------
 if __name__ == "__main__":
-    test_urls = [
-        "https://www.youtube.com/watch?v=abcd1234",
-        "https://www.bilibili.com/video/BV1xx411c7mD",
-        "https://v.qq.com/x/page/x12345.html",
-        "https://www.douyin.com/video/123456",
-        "https://weibo.com/xxxxxx"
-    ]
-
-    for url in test_urls:
-        try:
-            download_video(url, "downloads/")
-        except Exception as e:
-            print(f"[downloader] Error: {e}")
+    asyncio.run(download_video())
