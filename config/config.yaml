@@ -1,0 +1,25 @@
+# =============================
+# 项目通用配置
+# =============================
+video:
+  source: "https://www.bilibili.com/video/BV1NCgVzoEG9/"
+  download_path: "./downloads"
+  language: "zh"
+
+output:
+  markdown_path: "./notes"
+  include_images: true
+  mermaid_diagrams: true
+  auto_summary_sections: ["概述", "原理图", "代码讲解", "应用场景"]
+
+ai:
+  default_provider: "qwen"  # 默认使用的 AI 供应商
+  model: "qwen-turbo"
+  temperature: 0.7
+
+notion:
+  enable: true
+  token: "notion-secret-xxx"
+  database_id: "xxxx-xxxx-xxxx"
+  tags: ["AI 学习", "视频总结"]
+  publish_status: "Published"

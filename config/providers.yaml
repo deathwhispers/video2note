@@ -1,0 +1,53 @@
+# =============================
+# AI 供应商配置
+# =============================
+providers:
+
+  openai:
+    endpoint: "https://api.openai.com/v1/chat/completions"
+    api_key: "sk-xxxx"
+    models:
+      - gpt-4o
+      - gpt-4o-mini
+      - gpt-3.5-turbo
+    prompt_template: |
+      你是一个技术笔记生成助手，请基于以下视频转录内容生成 Markdown 技术文档：
+      要求包括：章节标题、代码示例、mermaid 图、总结。
+      内容如下：
+      {{transcript}}
+
+  anthropic:
+    endpoint: "https://api.anthropic.com/v1/messages"
+    api_key: "claude-xxx"
+    models:
+      - claude-3-opus
+      - claude-3-sonnet
+      - claude-3-haiku
+
+  gemini:
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent"
+    api_key: "AIzaSyDWh_nZk5xSxTW98nwjN-B4uJ8mVyIThvA"
+    models:
+      - gemini-1.5-pro
+      - gemini-1.5-flash
+
+  qwen:
+    endpoint: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+    api_key: "sk-d54c353aba7d44db8382b92e0500fbd4"
+    models:
+      - qwen-turbo
+      - qwen-plus
+
+  ernie:
+    endpoint: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/{{model}}"
+    api_key: "xxxx"
+    models:
+      - ernie-bot
+      - ernie-bot-turbo
+
+  vllm:
+    endpoint: "{{base_url}}/generate"
+    api_key: ""
+    models:
+      - llama-3-8b
+      - mistral-7b

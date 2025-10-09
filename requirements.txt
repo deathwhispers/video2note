@@ -1,0 +1,5 @@
+PyYAML
+requests
+youtube-dl
+openai
+ffmpeg-python
