@@ -12,11 +12,27 @@ def ensure_dir(path):
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
 
+def replace_env_vars(obj: Any) -> Any:
+    """递归替换 ${VAR_NAME} 为环境变量值"""
+    if isinstance(obj, dict):
+        return {key: replace_env_vars(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [replace_env_vars(item) for item in obj]
+    elif isinstance(obj, str) and obj.startswith("${") and obj.endswith("}"):
+        var_name = obj[2:-1]  # 去掉 ${ 和 }
+        value = os.getenv(var_name)
+        if value is None:
+            raise ValueError(f"Environment variable '{var_name}' not set, but referenced in config.yaml")
+        return value
+    else:
+        return obj
 
+# 加载 config.yaml 配置文件（支持环境变量替换）
 def load_config() -> Dict[str, Any]:
     """加载配置文件"""
     with open("config/config.yaml", "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    return replace_env_vars(config)
 
 
 def parse_subtitles(video_dir):

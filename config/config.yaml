@@ -24,8 +24,8 @@ video:
 # AI 配置
 # =============================
 ai:
-  provider: "local"       # 可选：openai / anthropic / gemini / qwen / ernie / vllm / local
-  model: "gpt-4o-mini"
+  provider: "qwen"       # 可选：openai / anthropic / gemini / qwen / ernie / vllm / local
+  model: "qwen-turbo"
   temperature: 0.7
 
 # =============================
@@ -33,7 +33,7 @@ ai:
 # =============================
 providers:
   openai:
-    api_key: "sk--xxx"
+    api_key: ${OPENAI_API_KEY}
     endpoint: "https://api.openai.com/v1/chat/completions"
     prompt_template: |
       你是专业技术文档撰写者，请基于以下视频内容（转写+字幕）生成结构严谨的Markdown笔记：
@@ -50,21 +50,34 @@ providers:
       【可用图片】
       {{frames}}
 
-  anthropic:
-    api_key: "claude-xxx"
-    endpoint: "https://api.anthropic.com/v1/messages"
+  # 豆包配置
+  doubao:
+    api_key: ${DOUBAO_API_KEY}
+    endpoint: "https://api.doubao.com/v1/chat/completions"  # 摘要接口
+    audio_endpoint: "https://api.doubao.com/v1/audio/transcriptions"  # 转写接口
+    prompt_template: |
+      基于以下视频内容生成技术笔记，包含「概述」「核心原理」「代码案例」「总结」：
+      {{transcript}}
+      可用图片：{{frames}}
 
-  ernie:
-    api_key: "xxxx"
-    endpoint: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/{{model}}"
+  # DeepSeek配置
+  deepseek:
+    api_key: ${DEEPSEEK_API_KEY}
+    endpoint: "https://api.deepseek.com/v1/chat/completions"  # 摘要接口
+    audio_endpoint: "https://api.deepseek.com/v1/audio/transcribe"  # 转写接口
+    prompt_template: |
+      基于以下视频内容生成技术笔记，包含「概述」「核心原理」「代码案例」「总结」：
+      {{transcript}}
+      可用图片：{{frames}}
 
-  gemini:
-    api_key: "AIza-xxxx"
-    endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent"
-
+  # 通义千问完整配置
   qwen:
-    api_key: "ak-xxxx"
+    api_key: ${QWEN_API_KEY}
     endpoint: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+    prompt_template: |
+      基于以下视频内容生成技术笔记，包含「概述」「核心原理」「代码案例」「总结」：
+      {{transcript}}
+      可用图片：{{frames}}
 
   local:
     summarizer: "rules" # 可选：rules / light-nlp

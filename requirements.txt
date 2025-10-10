@@ -14,3 +14,6 @@ bilix>=0.18.9
 # 可选
 requests>=2.31.0
 
+# 新增AI供应商依赖
+dashscope>=1.14.0  # 通义千问SDK
+requests>=2.31.0   # 豆包/DeepSeek API调用

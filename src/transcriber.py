@@ -119,16 +119,145 @@ def transcribe_with_mock(audio_path, config):
     return "这是模拟的音频转写文本（测试用）"
 
 
-def transcribe_with_gemini(audio_path, config):
-    logger.warning("[transcriber] Gemini转写未实现，使用mock")
-    return transcribe_with_mock(audio_path, config)
+# 豆包转写（音频转文本）
+def transcribe_with_doubao(audio_path, config):
+    import requests
+
+    doubao_cfg = config.get("providers", {}).get("doubao", {})
+    api_key = doubao_cfg.get("api_key")
+    endpoint = doubao_cfg.get("endpoint", "https://api.doubao.com/v1/audio/transcriptions")
+
+    if not api_key:
+        raise ValueError("豆包API密钥未配置（providers.doubao.api_key）")
+
+    # 读取音频文件
+    with open(audio_path, "rb") as f:
+        audio_data = f.read()
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/octet-stream"
+    }
+    params = {
+        "language": config.get("video", {}).get("language", "zh"),
+        "model": config.get("ai", {}).get("model", "doubao-6b-audio")
+    }
+
+    logger.info(f"[transcriber] 使用豆包模型 {params['model']} 转写")
+    try:
+        response = requests.post(
+            url=endpoint,
+            headers=headers,
+            params=params,
+            data=audio_data,
+            timeout=60
+        )
+        response.raise_for_status()
+        result = response.json()
+        return result.get("text", "")
+    except Exception as e:
+        logger.error(f"[transcriber] 豆包转写失败：{str(e)}")
+        raise
 
 
-def transcribe_with_qwen(audio_path, config):
-    logger.warning("[transcriber] Qwen转写未实现，使用mock")
-    return transcribe_with_mock(audio_path, config)
+# -------------------------------
+# 新增：DeepSeek转写（音频转文本）
+# -------------------------------
+def transcribe_with_deepseek(audio_path, config):
+    import requests
+
+    deepseek_cfg = config.get("providers", {}).get("deepseek", {})
+    api_key = deepseek_cfg.get("api_key")
+    endpoint = deepseek_cfg.get("endpoint", "https://api.deepseek.com/v1/audio/transcribe")
+
+    if not api_key:
+        raise ValueError("DeepSeek API密钥未配置（providers.deepseek.api_key）")
+
+    with open(audio_path, "rb") as f:
+        files = {"file": f}
+        data = {
+            "model": config.get("ai", {}).get("model", "deepseek-audio-v1"),
+            "language": config.get("video", {}).get("language", "zh")
+        }
+        headers = {"Authorization": f"Bearer {api_key}"}
+
+        logger.info(f"[transcriber] 使用DeepSeek模型 {data['model']} 转写")
+        try:
+            response = requests.post(
+                url=endpoint,
+                headers=headers,
+                data=data,
+                files=files,
+                timeout=60
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result.get("transcription", "")
+        except Exception as e:
+            logger.error(f"[transcriber] DeepSeek转写失败：{str(e)}")
+            raise
 
 
+# -------------------------------
+# 通义千问（Qwen）真实转写
+# -------------------------------
+def transcribe_with_qwen(audio_path: str, config: dict) -> str:
+    import dashscope
+    import os
+
+    if not os.path.exists(audio_path):
+        raise FileNotFoundError(f"音频文件不存在: {audio_path}")
+
+    qwen_cfg = config.get("providers", {}).get("qwen", {})
+    api_key = qwen_cfg.get("api_key")
+    if not api_key:
+        raise ValueError("通义千问API密钥未配置（providers.qwen.api_key）")
+
+    model = config.get("ai", {}).get("asr_model", "qwen-audio-v1")
+    language_hint = config.get("video", {}).get("language", "zh")
+
+    # 可选：根据语言设置提示语（提升识别准确率）
+    language_prompts = {
+        "zh": "请将音频内容逐字转写为中文文本，不要总结。",
+        "en": "Please transcribe the audio content verbatim into English text.",
+        "ja": "音声内容を逐語的に日本語テキストに書き起こしてください。",
+        "ko": "오디오 내용을 한글 텍스트로 충실하게 받아쓰기 하세요."
+    }
+    prompt_text = language_prompts.get(language_hint, "Transcribe the audio.")
+
+    try:
+        # ✅ 正确调用方式：使用 messages + content 列表
+        response = dashscope.Generation.call(
+            model="paraformer-v2",
+            api_key=api_key,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"audio": audio_path},
+                        {"text": prompt_text}
+                    ]
+                }
+            ]
+        )
+    except Exception as e:
+        raise RuntimeError(f"调用通义千问 ASR 失败: {e}")
+
+    # 解析响应
+    if response.status_code == 200:
+        choices = response.output.get("choices", [])
+        if not choices:
+            raise ValueError("ASR 返回结果为空")
+        content = choices[0].get("message", {}).get("content", "").strip()
+        return content
+    else:
+        raise RuntimeError(
+            f"ASR 请求失败 [code={response.code}]: {response.message} "
+            f"(request_id={response.request_id})"
+        )
+
+
+# 主转写函数
 def transcribe(audio_path, config):
     if config.get("app", {}).get("mock", False):
         return transcribe_with_mock(audio_path, config)
@@ -136,10 +265,12 @@ def transcribe(audio_path, config):
     provider = config.get("ai", {}).get("provider", "openai").lower()
     if provider == "openai":
         return transcribe_with_openai(audio_path, config)
-    elif provider == "gemini":
-        return transcribe_with_gemini(audio_path, config)
     elif provider == "qwen":
-        return transcribe_with_qwen(audio_path, config)
+        return transcribe_with_qwen(audio_path, config)  # 替换原占位函数
+    elif provider == "doubao":
+        return transcribe_with_doubao(audio_path, config)  # 新增
+    elif provider == "deepseek":
+        return transcribe_with_deepseek(audio_path, config)  # 新增
     elif provider == "local":
         return transcribe_with_whisper_local(audio_path, config)
     else:

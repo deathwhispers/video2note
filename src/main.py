@@ -1,12 +1,19 @@
 import os
+
+from dotenv import load_dotenv
+
 from src.downloader import download_video  # 注意：需确保download_video返回视频文件列表
 from src.notion_sync import sync_to_notion
 from src.summarizer import summarize, save_markdown
-from src.transcriber import extract_audio, transcribe, extract_key_frames,transcribe_with_whisper_local
+from src.transcriber import extract_audio, transcribe, extract_key_frames
 from src.utils import load_config, logger, parse_subtitles
+
+# 加载 .env 文件（如果存在）
+load_dotenv()
 
 
 def run_pipeline():
+    # 加载配置文件
     cfg = load_config()
     video_cfg = cfg.get("video", {})
     output_cfg = cfg.get("output", {})
@@ -34,7 +41,6 @@ def run_pipeline():
         logger.error(f"视频下载失败：{str(e)}", exc_info=True)
         return
 
-
     # 2. 解析所有字幕（支持多视频字幕合并）
     logger.info("===== Step 2: 解析字幕 =====")
     subtitles = parse_subtitles(download_path)  # 解析整个下载目录下的字幕
@@ -42,10 +48,10 @@ def run_pipeline():
     if subtitles:
         # 按字幕文件顺序合并内容（可根据文件名排序，确保与视频顺序一致）
         sorted_subtitles = sorted(subtitles, key=lambda x: x["path"])  # 按路径排序
-        subtitle_text = "\n\n".join([f"【字幕文件：{s['path'].split('/')[-1]}】\n{s['content']}" for s in sorted_subtitles])
+        subtitle_text = "\n\n".join(
+            [f"【字幕文件：{s['path'].split('/')[-1]}】\n{s['content']}" for s in sorted_subtitles])
     else:
         logger.warning("未找到字幕文件，将仅使用音频转写内容")
-
 
     # 3. 音频转写（循环处理每个视频）
     logger.info("===== Step 3: 音频转写 =====")
@@ -67,7 +73,6 @@ def run_pipeline():
         logger.error("所有视频音频转写失败，终止流程")
         return
 
-
     # 4. 提取关键帧（循环处理每个视频）
     logger.info("===== Step 4: 提取关键帧 =====")
     all_frames = []
@@ -81,10 +86,8 @@ def run_pipeline():
 
     logger.info(f"共提取关键帧 {len(all_frames)} 张")
 
-
     # 5. 合并转写与字幕内容，生成完整文本
     full_transcript = f"【所有字幕内容汇总】\n{subtitle_text}\n\n【所有音频转写汇总】\n{''.join(transcript_texts)}"
-
 
     # 6. 生成Markdown笔记
     logger.info("===== Step 5: 生成Markdown =====")
@@ -98,7 +101,6 @@ def run_pipeline():
         logger.error(f"笔记生成失败：{str(e)}", exc_info=True)
         return
 
-
     # 7. 同步到Notion（可选）
     if cfg.get("notion", {}).get("enable", True):
         logger.info("===== Step 6: 同步到Notion =====")
@@ -106,7 +108,6 @@ def run_pipeline():
             sync_to_notion(md_file, cfg, frames=all_frames)
         except Exception as e:
             logger.error(f"Notion同步失败：{str(e)}", exc_info=True)  # 同步失败不中断整个流程
-
 
     logger.info("===== 全流程完成 =====")
 
