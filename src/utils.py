@@ -1,26 +1,53 @@
-import os
-import yaml
 import logging
+import os
+from typing import Dict, Any
 
-# -------------------------------
-# 配置加载
-# -------------------------------
-def load_config(config_path="config/config.yaml"):
-    """
-    加载 YAML 配置文件，返回 dict
-    """
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"配置文件不存在: {config_path}")
-    with open(config_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    return cfg
+import pysrt
+import yaml
+import ass
 
-# -------------------------------
-# 创建目录
-# -------------------------------
+
 def ensure_dir(path):
+    """确保目录存在"""
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
+
+
+def load_config() -> Dict[str, Any]:
+    """加载配置文件"""
+    with open("config/config.yaml", "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def parse_subtitles(video_dir):
+    """解析字幕文件（支持.srt/.ass），返回纯文本内容"""
+    subtitles = []
+    for root, _, files in os.walk(video_dir):
+        for file in files:
+            file_path = os.path.join(root, file)
+            try:
+                if file.endswith(".srt"):
+                    # 解析.srt字幕
+                    subs = pysrt.open(file_path)
+                    text = "\n".join([sub.text for sub in subs])  # 提取纯文本（去掉时间轴）
+                    subtitles.append({"path": file_path, "content": text})
+                elif file.endswith(".ass"):
+                    # 解析.ass字幕（使用ass库）
+                    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                        ass_doc = ass.parse(f)  # 解析ass文件
+                        # 提取对话文本（过滤空行和样式标记）
+                        dialogues = []
+                        for event in ass_doc.events:
+                            # 忽略样式标记（如{\c&HFFFFFF&}）和空文本
+                            clean_text = event.text.strip()
+                            if clean_text and not clean_text.startswith("{"):
+                                dialogues.append(clean_text)
+                        text = "\n".join(dialogues)
+                        subtitles.append({"path": file_path, "content": text})
+            except Exception as e:
+                logger.warning(f"解析字幕 {file_path} 失败：{e}")
+    return subtitles if subtitles else None
+
 
 # -------------------------------
 # 日志系统
