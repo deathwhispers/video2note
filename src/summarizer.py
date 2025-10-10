@@ -1,100 +1,131 @@
 import os
-from src.utils import ensure_dir, load_config, logger
 
-# -------------------------------
-# OpenAI 生成 Markdown
-# -------------------------------
-def summarize_with_openai(text, config):
+from src.utils import ensure_dir, logger
+
+def summarize_with_rules(full_transcript, config, frames=None):
+    """用规则生成结构化Markdown，无需模型"""
+    md = []
+    # 1. 标题
+    video_title = config.get("video", {}).get("source", "视频笔记").split("/")[-1]
+    md.append(f"# {video_title} 笔记")
+
+    # 2. 概述（取前300字）
+    md.append("## 概述")
+    md.append(full_transcript[:300] + "...")
+
+    # 3. 完整字幕
+    if "[字幕内容]" in full_transcript:
+        md.append("## 字幕内容")
+        md.append(full_transcript.split("[字幕内容]")[1].split("[音频转写]")[0].strip())
+
+    # 4. 完整音频转写
+    if "[音频转写]" in full_transcript:
+        md.append("## 音频转写")
+        md.append(full_transcript.split("[音频转写]")[1].strip())
+
+    # 5. 关键帧引用
+    if frames:
+        md.append("## 关键帧")
+        for i, frame in enumerate(frames[:5]):  # 只展示前5张
+            md.append(f"![关键帧{i + 1}]({frame})")
+
+    return "\n\n".join(md)
+
+def summarize_with_light_nlp(full_transcript, config, frames=None):
+    """用轻量NLP库生成笔记"""
+    import spacy
+    from nltk.tokenize import sent_tokenize
+
+    nlp = spacy.load("zh_core_web_sm")  # 加载中文NLP模型
+    doc = nlp(full_transcript[:5000])  # 取前5000字处理
+
+    # 提取关键词
+    keywords = [ent.text for ent in doc.ents if ent.label_ in ["PERSON", "ORG", "GPE", "PRODUCT"]]
+
+    # 分割段落
+    sentences = sent_tokenize(full_transcript)
+    chunks = [sentences[i:i+5] for i in range(0, len(sentences), 5)]  # 每5句一段
+
+    # 生成MD
+    md = [f"# 视频笔记（关键词：{', '.join(keywords[:5])}）"]
+    md.append("## 核心内容")
+    for i, chunk in enumerate(chunks[:3]):  # 前3段
+        md.append(f"### 段落{i+1}")
+        md.append(" ".join(chunk))
+
+    # 关键帧
+    if frames:
+        md.append("## 关键帧")
+        md.extend([f"![帧{i}]({f})" for i, f in enumerate(frames[:3])])
+
+    return "\n\n".join(md)
+
+
+def summarize_with_local(text, config, frames=None):
+    providers = config.get("providers", {})
+    local_cfg = providers.get("local", {})
+    summarizer = local_cfg.get("summarizer", "rules")
+    if summarizer == "rules":
+        return summarize_with_rules(text, config, frames)
+    elif summarizer == "light-nlp":
+        return summarize_with_light_nlp(text, config, frames)
+    else:
+        logger.warning(f"未知local summarizer {local_cfg.get('summarizer')}，使用mock")
+        return summarize_with_mock(text, config, frames)
+
+
+def summarize_with_openai(text, config, frames=None):
     import openai
     providers = config.get("providers", {})
     openai_cfg = providers.get("openai", {})
     openai.api_key = openai_cfg.get("api_key")
-    model = config.get("ai.model", "gpt-4o-mini")
-    temperature = config.get("ai.temperature", 0.7)
+    model = config.get("ai", {}).get("model", "gpt-4o-mini")
+    temperature = config.get("ai", {}).get("temperature", 0.7)
     prompt_template = openai_cfg.get("prompt_template", "{{transcript}}")
 
-    prompt = prompt_template.replace("{{transcript}}", text)
+    # 处理图片路径
+    frames_str = "\n".join(frames) if frames else "无图片"
+    prompt = prompt_template.replace("{{transcript}}", text).replace("{{frames}}", frames_str)
 
-    logger.info(f"[summarizer] 调用 OpenAI LLM 生成 Markdown 笔记 ...")
+    logger.info("[summarizer] 调用OpenAI生成笔记...")
     response = openai.ChatCompletion.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature
     )
-    md_text = response.choices[0].message.content
-    return md_text
+    return response.choices[0].message.content
 
 
-# -------------------------------
-# Mock 模式
-# -------------------------------
-def summarize_with_mock(text, config):
-    logger.info("[summarizer] Mock 模式生成 Markdown")
-    return f"# 模拟笔记\n\n{text[:200]}...\n\n## 章节示例\n- 概述\n- 原理图\n- 代码讲解\n- 应用场景"
+def summarize_with_mock(text, config, frames=None):
+    frames_str = "\n".join(frames) if frames else "无图片"
+    return f"# 模拟笔记\n\n## 转写内容\n{text[:200]}...\n\n## 图片\n{frames_str}"
 
 
-# -------------------------------
-# 其他厂商可扩展
-# -------------------------------
-def summarize_with_gemini(text, config):
-    logger.info("[summarizer] Gemini 生成笔记暂未实现，使用 mock")
-    return summarize_with_mock(text, config)
-
-def summarize_with_qwen(text, config):
-    logger.info("[summarizer] Qwen 生成笔记暂未实现，使用 mock")
-    return summarize_with_mock(text, config)
-
-def summarize_with_ernie(text, config):
-    logger.info("[summarizer] Ernie 生成笔记暂未实现，使用 mock")
-    return summarize_with_mock(text, config)
-
-def summarize_with_vllm(text, config):
-    logger.info("[summarizer] VLLM 生成笔记暂未实现，使用 mock")
-    return summarize_with_mock(text, config)
+def summarize_with_gemini(text, config, frames=None):
+    logger.warning("[summarizer] Gemini未实现，使用mock")
+    return summarize_with_mock(text, config, frames)
 
 
-# -------------------------------
-# 统一接口
-# -------------------------------
-def summarize(text, config):
-    if config.get("app.mock", False):
-        return summarize_with_mock(text, config)
+def summarize(text, config, frames=None):
+    if config.get("app", {}).get("mock", False):
+        return summarize_with_mock(text, config, frames)
 
-    provider = config.get("ai.provider", "openai").lower()
+    provider = config.get("ai", {}).get("provider", "openai").lower()
     if provider == "openai":
-        return summarize_with_openai(text, config)
+        return summarize_with_openai(text, config, frames)
     elif provider == "gemini":
-        return summarize_with_gemini(text, config)
-    elif provider == "qwen":
-        return summarize_with_qwen(text, config)
-    elif provider == "ernie":
-        return summarize_with_ernie(text, config)
-    elif provider == "vllm":
-        return summarize_with_vllm(text, config)
+        return summarize_with_gemini(text, config, frames)
+    elif provider == "local":
+        return summarize_with_local(text, config, frames)
     else:
-        logger.warning(f"[summarizer] 未知 provider {provider}，使用 mock")
-        return summarize_with_mock(text, config)
+        logger.warning(f"未知provider {provider}，使用mock")
+        return summarize_with_mock(text, config, frames)
 
 
-# -------------------------------
-# 保存 Markdown 文件
-# -------------------------------
 def save_markdown(md_text, output_dir, filename="note.md"):
     ensure_dir(output_dir)
     file_path = os.path.join(output_dir, filename)
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(md_text)
-    logger.info(f"[summarizer] Markdown 笔记已保存: {file_path}")
+    logger.info(f"[summarizer] 笔记已保存: {file_path}")
     return file_path
-
-
-# -------------------------------
-# CLI 测试
-# -------------------------------
-if __name__ == "__main__":
-    cfg = load_config()
-    # 假设 transcriber 输出的文本
-    sample_text = "这是转写后的示例文本，用于生成 Markdown 笔记。"
-    md = summarize(sample_text, cfg)
-    output_dir = cfg.get("output.markdown_path", "./notes")
-    save_markdown(md, output_dir)

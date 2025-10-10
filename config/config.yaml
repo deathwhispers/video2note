@@ -9,21 +9,22 @@ app:
 # 视频下载配置
 # =============================
 video:
-  source: "https://www.bilibili.com/video/BV1NCgVzoEG9/"  # 视频链接
+  url: "https://www.bilibili.com/video/BV1NCgVzoEG9/"  # 视频链接
   download_path: "./downloads"
   language: "zh"
   quality: "best"        # 支持 best, 1080, 720 等
   login:
     method: "cookies"    # 登录方式：cookies / qrcode / account
-    cookies_path: "config/www.bilibili.com_cookies.txt"
+    cookies_path: "./config/bilibili_cookies.txt"
     username: ""         # account 登录模式需要
     password: ""         # account 登录模式需要
+  frame_interval: 10     # 关键帧提取间隔（秒）
 
 # =============================
 # AI 配置
 # =============================
 ai:
-  provider: "openai"       # 可选：openai / anthropic / gemini / qwen / ernie / vllm
+  provider: "local"       # 可选：openai / anthropic / gemini / qwen / ernie / vllm / local
   model: "gpt-4o-mini"
   temperature: 0.7
 
@@ -32,13 +33,52 @@ ai:
 # =============================
 providers:
   openai:
-    api_key: "sk-xxxx"
+    api_key: "sk--xxx"
     endpoint: "https://api.openai.com/v1/chat/completions"
     prompt_template: |
-      你是一个技术笔记生成助手，请基于以下视频转录内容生成 Markdown 技术文档：
-      要求包括：章节标题、代码示例、mermaid 图、总结。
-      内容如下：
+      你是专业技术文档撰写者，请基于以下视频内容（转写+字幕）生成结构严谨的Markdown笔记：
+      
+      【核心要求】
+      1. 结构：包含「概述」「核心原理」「关键步骤」「代码/案例」「总结」5个一级章节
+      2. 图文：在相关章节插入图片引用（图片路径：{{frames}}），描述画面核心信息
+      3. 细节：保留技术术语、数据、代码片段，补充逻辑衔接语句
+      4. 格式：代码用```包裹，列表用-或1.，重要内容加粗
+      
+      【视频内容】
       {{transcript}}
+      
+      【可用图片】
+      {{frames}}
+
+  anthropic:
+    api_key: "claude-xxx"
+    endpoint: "https://api.anthropic.com/v1/messages"
+
+  ernie:
+    api_key: "xxxx"
+    endpoint: "https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/{{model}}"
+
+  gemini:
+    api_key: "AIza-xxxx"
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/models/{{model}}:generateContent"
+
+  qwen:
+    api_key: "ak-xxxx"
+    endpoint: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
+
+  local:
+    summarizer: "rules" # 可选：rules / light-nlp
+    transcriber: "whisper" # 可选：whisper / local
+
+
+# =============================
+# 输出配置
+# =============================
+output:
+  markdown_path: "./notes"
+  include_images: true
+  mermaid_diagrams: true
+  auto_summary_sections: ["概述", "原理图", "代码讲解", "应用场景"]
 
 # =============================
 # Notion 同步配置（可选）
