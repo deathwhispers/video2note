@@ -1,0 +1,57 @@
+app:
+  # 是否开启 mock 模式（转写 /摘要 /同步时用 mock 实现代替真实 API）
+  mock: false
+  log_level: INFO
+
+video:
+  # 视频源 URL（单 P 或合集）
+  url: "https://www.bilibili.com/video/xxx"
+  # 输出目录（视频 /音频 /帧等保存根目录）
+  download_path: "./downloads"
+  # 关键帧间隔 /秒（如果你在下载后要提帧）
+  frame_interval: 10
+  # 语言提示（如 "zh", "en" 等）
+  language: "zh"
+  # 用于构造笔记标题 /标识的源（如 URL / 文件名等）
+  source: "视频笔记"
+
+transcriber:
+  provider: "openai"        # 可选值：openai / local_whisper / qwen / doubao / mock 等
+
+providers:
+  openai:
+    api_key: "YOUR_OPENAI_API_KEY"
+    model: "whisper-1"
+    # 如果你的摘要 / chat 模型也在这里：
+    #（对于转写，这里只配置转写相关参数）
+    prompt_template: "{{transcript}}"
+
+  local:
+    whisper_model: "base"   # 用于本地 whisper 转写
+
+  qwen:
+    api_key: "YOUR_QWEN_API_KEY"
+    asr_model: "qwen-audio-v1"
+    # prompt_template 可用于摘要 /转写阶段视你设计而定
+
+  doubao:
+    api_key: "YOUR_DOUBAO_API_KEY"
+    endpoint: "https://api.doubao.com/v1/audio/transcriptions"
+    prompt_template: "{{transcript}}"
+
+  deepseek:
+    api_key: "YOUR_DEEPSEEK_API_KEY"
+    endpoint: "https://api.deepseek.com/v1/audio/transcribe"
+    prompt_template: "{{transcript}}"
+
+summarizer:
+  provider: "openai"        # 可选值：openai / rule / local / doubao / qwen / mock
+
+notion:
+  provider: "notion"
+  token: "YOUR_NOTION_INTEGRATION_TOKEN"
+  database_id: "YOUR_NOTION_DATABASE_ID"
+
+output:
+  # Markdown 笔记保存路径
+  markdown_path: "./notes"

@@ -9,16 +9,39 @@ app:
 # 视频下载配置
 # =============================
 video:
+  # 视频源 URL（单 P 或合集）
   url: "https://www.bilibili.com/video/BV1NCgVzoEG9/"  # 视频链接
+  # 输出目录（视频 /音频 /帧等保存根目录）
   download_path: "./downloads"
   language: "zh"
+  frame_interval: 10     # 关键帧提取间隔（秒）
   quality: "best"        # 支持 best, 1080, 720 等
   login:
     method: "cookies"    # 登录方式：cookies / qrcode / account
     cookies_path: "./config/bilibili_cookies.txt"
     username: ""         # account 登录模式需要
     password: ""         # account 登录模式需要
-  frame_interval: 10     # 关键帧提取间隔（秒）
+
+
+# =============================
+# Notion 同步配置（可选）
+# =============================
+notion:
+  enable: true
+  token: "notion-secret-xxx"
+  database_id: "xxxx-xxxx-xxxx"
+  tags: [ "AI 学习", "视频总结" ]
+  publish_status: "Published"
+
+# =============================
+# 输出配置
+# =============================
+output:
+  markdown_path: "./notes"
+  include_images: true
+  mermaid_diagrams: true
+  auto_summary_sections: [ "概述", "原理图", "代码讲解", "应用场景" ]
+
 
 # =============================
 # AI 配置
@@ -82,23 +105,3 @@ providers:
   local:
     summarizer: "rules" # 可选：rules / light-nlp
     transcriber: "whisper" # 可选：whisper / local
-
-
-# =============================
-# 输出配置
-# =============================
-output:
-  markdown_path: "./notes"
-  include_images: true
-  mermaid_diagrams: true
-  auto_summary_sections: ["概述", "原理图", "代码讲解", "应用场景"]
-
-# =============================
-# Notion 同步配置（可选）
-# =============================
-notion:
-  enable: true
-  token: "notion-secret-xxx"
-  database_id: "xxxx-xxxx-xxxx"
-  tags: ["AI 学习", "视频总结"]
-  publish_status: "Published"

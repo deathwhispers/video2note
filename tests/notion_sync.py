@@ -1,6 +1,6 @@
 import os
 
-from src.utils import logger
+from utils import logger
 
 try:
     from notion_client import Client

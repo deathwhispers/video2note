@@ -1,0 +1,24 @@
+[project]
+name = "video2note"
+version = "0.1.0"
+description = "Video to structured notes / summary / sync to Notion"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "deathwhispers", email = "deathwhispers@qq.com" }
+]
+requires-python = ">=3.8"
+dependencies = [
+    # 在这里列出运行时依赖
+    "requests",
+    "pydantic",
+    "ffmpeg-python",
+    # … 其他依赖
+]
+
+[project.scripts]
+video2note = "video2note.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

@@ -1,6 +1,6 @@
 import os
 
-from src.utils import ensure_dir, logger
+from utils import ensure_dir, logger
 
 def save_markdown(md_text, output_dir, filename="note.md"):
     ensure_dir(output_dir)

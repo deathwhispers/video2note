@@ -6,7 +6,7 @@ import bilix.sites.bilibili.api
 from bilix.exception import APIError, APIResourceError, APIUnsupportedError
 from bilix.sites.bilibili import DownloaderBilibili
 
-from src.utils import ensure_dir, logger
+from utils import ensure_dir, logger
 
 
 async def download_bilibili_video(url: str, download_path: str):

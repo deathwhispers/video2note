@@ -2,11 +2,11 @@ import os
 
 from dotenv import load_dotenv
 
-from src.downloader import download_video  # 注意：需确保download_video返回视频文件列表
-from src.notion_sync import sync_to_notion
-from src.summarizer import summarize, save_markdown
-from src.transcriber import extract_audio, transcribe, extract_key_frames
-from src.utils import load_config, logger, parse_subtitles
+from downloader import download_video  # 注意：需确保download_video返回视频文件列表
+from notion_sync import sync_to_notion
+from summarizer import summarize, save_markdown
+from transcriber import extract_audio, transcribe, extract_key_frames
+from utils import load_config, logger, parse_subtitles
 
 # 加载 .env 文件（如果存在）
 load_dotenv()
