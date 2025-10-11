@@ -1,6 +1,7 @@
 # src/video2note/cli.py
 
 import argparse
+import os
 import sys
 
 from video2note.config_manager.loader import load_config
@@ -10,13 +11,18 @@ from video2note.utils.logger import setup_logging
 
 def main():
     parser = argparse.ArgumentParser(prog="video2note")
-    parser.add_argument("--config", "-c", type=str, help="path to config yaml", default=None)
+    parser.add_argument("--config", "-c", type=str, help="path to config yaml", default="config/base_config.yaml")
     parser.add_argument("--mode", type=str,
                         choices=["full", "download-only", "transcribe-only", "summarize-only", "sync-only"],
                         default="full")
     args = parser.parse_args()
 
-    config = load_config(args.config)
+    # 获取当前脚本所在目录
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    # 构建配置文件的绝对路径
+    config_path = str(os.path.join(script_dir, args.config))
+
+    config = load_config(config_path)
     setup_logging(config.app.log_level)
 
     runner = Runner(config)
