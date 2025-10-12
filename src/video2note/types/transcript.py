@@ -1,6 +1,7 @@
 # src/video2note/types/transcript.py
 
-from typing import List
+from typing import List, Optional
+
 
 class Segment:
     def __init__(self, start: float, end: float, text: str, confidence: Optional[float] = None):

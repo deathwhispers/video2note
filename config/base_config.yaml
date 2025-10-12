@@ -42,8 +42,6 @@ output:
   mermaid_diagrams: true
   auto_summary_sections: [ "概述", "原理图", "代码讲解", "应用场景" ]
 
-transcriber:
-  provider: "local"
 
 # =============================
 # AI 配置

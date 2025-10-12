@@ -75,3 +75,32 @@ def extract_audio(video_file, config):
         logger.error(f"[transcriber] 音频提取失败: {e}")
         return None
 
+
+
+# -------------------------------
+# 关键帧提取
+# -------------------------------
+def extract_key_frames(video_file, output_dir, interval=10):
+    ensure_dir(output_dir)
+    frames = []
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", video_file,
+        "-vf", f"fps=1/{interval}",  # 每interval秒一帧
+        "-q:v", "2",  # 画质等级
+        os.path.join(output_dir, "frame_%04d.jpg")
+    ]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True)
+        # 收集帧路径
+        for f in os.listdir(output_dir):
+            if f.startswith("frame_") and f.endswith(".jpg"):
+                frames.append(os.path.join(output_dir, f))
+        logger.info(f"[transcriber] 提取关键帧 {len(frames)} 张")
+        return frames
+    except Exception as e:
+        logger.error(f"[transcriber] 帧提取失败: {e}")
+        return []
+
+
+

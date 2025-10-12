@@ -1,3 +1,18 @@
+# pyproject.toml 是现代 Python 项目的核心配置文件，用于定义项目的元数据（名称、版本、作者等）、依赖管理规则、构建系统配置以及工具链设置（如脚本入口、代码规范等）。
+# 它替代了传统的 setup.py setup.cfg 等文件，是 PEP 518 规范中定义的标准配置格式，被 pip、setuptools、poetry 等工具广泛支持。
+# [tool.poetry.scripts] 是 Poetry 工具特有的配置项（Poetry 是一个流行的 Python 项目管理工具），用于定义可执行命令脚本。
+# 配置 video2note = "video2note.cli:main" 的含义是：
+#   当通过 poetry install 安装项目时，Poetry 会自动创建一个名为 video2note 的命令行可执行程序。
+#   该命令被调用时，会执行 video2note.cli 模块中的 main 函数（即 video2note/cli.py 中的 main() 方法）。
+# 作用：简化项目调用，无需手动输入 python -m video2note.cli，直接在终端输入 video2note 即可运行程序。
+#
+# [project.scripts] 配置说明：
+# 配置 video2note = "video2note.cli:main" 的含义是：
+#   当通过支持 PEP 621 的工具（如 setuptools、pip）安装项目时（例如 pip install .），会自动生成一个名为 video2note 的命令行工具。
+#   该命令被调用时，会执行 video2note.cli 模块中的 main 函数，与上述 Poetry 配置的逻辑一致。
+# 作用：这是跨工具的标准配置，无论使用 Poetry、setuptools 还是其他兼容 PEP 621 的工具，都能通过该配置生成一致的命令行入口。
+
+
 [project]
 name = "video2note"
 version = "0.1.0"

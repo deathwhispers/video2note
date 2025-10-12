@@ -1,10 +1,12 @@
 # src/video2note/config_manager/loader.py
 
-import os
 from pathlib import Path
-import yaml
-from video2note.config_manager.validator import validate_config
 from types import SimpleNamespace
+
+import yaml
+
+from video2note.config_manager.validator import validate_config
+
 
 def merge_dict(d: dict, u: dict):
     for k, v in u.items():
@@ -12,6 +14,7 @@ def merge_dict(d: dict, u: dict):
             merge_dict(d[k], v)
         else:
             d[k] = v
+
 
 def dict_to_namespace(d: dict):
     ns = SimpleNamespace()
@@ -22,31 +25,30 @@ def dict_to_namespace(d: dict):
             setattr(ns, k, v)
     return ns
 
+
 def load_config(config_path: str = None):
-    # 假定配置目录在项目根 “config/”
-    project_root = Path(__file__).parent.parent.parent
-    base_cfg_path = project_root / "config" / "base_config.yaml"
-    cfg = {}
-    with open(base_cfg_path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
+    # 获取项目根目录
+    project_root = Path(__file__).resolve().parents[3]
 
-    # 根据环境变量覆盖
-    env = os.getenv("VIDEO2NOTE_ENV", "dev")
-    override_path = project_root / "config" / f"{env}_config.yaml"
-    if override_path.exists():
-        with open(override_path, "r", encoding="utf-8") as f:
-            override = yaml.safe_load(f)
-        merge_dict(cfg, override)
-
-    # 用户指定的配置覆盖
+    # 如果用户指定了配置文件路径
     if config_path:
         user_path = Path(config_path)
-        if user_path.exists():
-            with open(user_path, "r", encoding="utf-8") as f:
-                user_cfg = yaml.safe_load(f)
-            merge_dict(cfg, user_cfg)
-        else:
-            raise FileNotFoundError(f"Config file {config_path} not found")
+        # 如果是相对路径，转为相对于项目根目录
+        if not user_path.is_absolute():
+            user_path = project_root / user_path
+        if not user_path.exists():
+            raise FileNotFoundError(f"用户指定配置文件不存在: {user_path}")
+        cfg_path = user_path
+    else:
+        # 默认配置文件路径
+        cfg_path = project_root / "config" / "base_config.yaml"
+        if not cfg_path.exists():
+            raise FileNotFoundError(f"默认配置文件不存在: {cfg_path}")
 
-    validate_config(cfg)
+
+    # 加载配置文件
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+
+    # validate_config(cfg)
     return dict_to_namespace(cfg)

@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import pathlib
 import sys
 
 from video2note.config_manager.loader import load_config
@@ -17,12 +18,7 @@ def main():
                         default="full")
     args = parser.parse_args()
 
-    # 获取当前脚本所在目录
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    # 构建配置文件的绝对路径
-    config_path = str(os.path.join(script_dir, args.config))
-
-    config = load_config(config_path)
+    config = load_config(args.config)
     setup_logging(config.app.log_level)
 
     runner = Runner(config)
@@ -41,3 +37,7 @@ def main():
         # 你可以引入 traceback / logger 打印更详细错误
         print(f"[Error] {e}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
