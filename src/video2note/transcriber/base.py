@@ -1,7 +1,13 @@
 # src/video2note/transcriber/base.py
-
+"""
+Transcriber 抽象基类与辅助函数
+- 提供 transcribe_file(audio_path) 以便直接传入音频路径独立调试
+- 提供 extract_audio(video_path, audio_dir) 辅助（基于 ffmpeg）
+"""
+import logging
 import os
 import subprocess
+import typing
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -16,8 +22,7 @@ class Transcriber(ABC):
     @abstractmethod
     def transcribe(self, audio_path: str) -> Transcript:
         """
-        转写音频文件为 Transcript。
-        如果失败，应抛出 TranscriptionError。
+        将单个音频文件转写为 Transcript 对象。这个方法是单独调试的入口。
         """
         raise NotImplementedError
 
@@ -52,27 +57,43 @@ class TranscriberFactory:
 # -------------------------------
 # 音频提取
 # -------------------------------
-def extract_audio(video_file, config):
-    audio_dir = config.get("transcriber", {}).get("audio_dir", "audio")
+
+
+def extract_audio(video_file: str, audio_dir: str, sample_rate: int = 16000) -> typing.Optional[str]:
+    """
+    从视频文件抽取音频到指定目录，返回音频文件路径（wav PCM 16k mono）。
+    若失败返回 None（调用方应处理异常）。
+    """
+    video_file = str(video_file)
+    audio_dir = str(audio_dir)
     ensure_dir(audio_dir)
 
-    # 生成与视频同名的音频文件名（替换扩展名为.wav）
-    audio_filename = Path(video_file).stem + ".wav"
-    audio_file = os.path.join(audio_dir, audio_filename)  # 完整音频路径
+    video_p = Path(video_file)
+    if not video_p.exists():
+        logging.error(f"[extract_audio] video file not found: {video_file}")
+        return None
+    audio_filename = video_p.stem + ".wav"
+    audio_path = os.path.join(audio_dir, audio_filename)
 
     cmd = [
         "ffmpeg", "-y",
         "-i", video_file,
-        "-vn", "-acodec", "pcm_s16le",
-        "-ar", "16000", "-ac", "1",
-        audio_file
+        "-vn",
+        "-acodec", "pcm_s16le",
+        "-ar", str(sample_rate),
+        "-ac", "1",
+        audio_path
     ]
+
     try:
         subprocess.run(cmd, check=True, capture_output=True)
-        logger.info(f"[transcriber] 音频提取完成: {audio_file}")
-        return audio_file
+        logger.info(f"[extract_audio] 音频提取完成: {audio_path}")
+        return audio_path
+    except subprocess.CalledProcessError as e:
+        logging.error(f"[extract_audio] ffmpeg 音频提取失败: {e.stderr.decode(errors='ignore') if e.stderr else e}")
+        return None
     except Exception as e:
-        logger.error(f"[transcriber] 音频提取失败: {e}")
+        logging.error(f"[extract_audio] failed: {e}")
         return None
 
 
