@@ -1,19 +1,20 @@
 # 核心工具
+yt-dlp>=2025.09.26
 PyYAML>=6.0
-yt-dlp>=2025.9.26
-you-get>=0.4.1570
-bilix>=0.18.9
-ffmpeg-python>=0.2.0
-notion-client>=2.0.0
-# notion-blocks>=0.1.5
-openai>=1.7.0
-
-# B站扫码/登录
-bilix>=0.18.9
-
-# 可选
 requests>=2.31.0
+ffmpeg-python>=0.2.0
+notion-client>=2.5.0
+openai>=2.2.0
+pydantic>=2.12.3
 
-# 新增AI供应商依赖
-dashscope>=1.14.0  # 通义千问SDK
-requests>=2.31.0   # 豆包/DeepSeek API调用
+# 视频下载工具
+bilix>=0.18.9  # 保留一个即可，移除重复项
+you-get>=0.4.1570
+
+# AI供应商SDK
+dashscope>=1.24.6  # 通义千问SDK
+# 豆包SDK依赖已包含在requests中
+# DeepSeek SDK依赖已包含在requests中
+
+# 工具库
+python-dotenv>=1.0.0  # 添加环境变量加载库，用于加载.env文件中的API密钥
